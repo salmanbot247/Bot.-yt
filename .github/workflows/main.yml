@@ -1,0 +1,77 @@
+name: Setup ngrok and Remote Desktop
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  setup-ngrok:
+    runs-on: windows-latest
+    timeout-minutes: 360  # Max allowed: 6 hours
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download ngrok (with retry)
+        run: |
+          $retry = 3
+          while ($retry -gt 0) {
+            try {
+              Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip -UseBasicParsing
+              if (Test-Path ngrok.zip) { break }
+            } catch {
+              Write-Host "Retrying download... ($retry left)"
+            }
+            Start-Sleep -Seconds 5
+            $retry--
+          }
+          if (!(Test-Path ngrok.zip)) { throw "❌ Failed to download ngrok after retries." }
+      - name: Extract ngrok
+        run: |
+          Expand-Archive ngrok.zip -DestinationPath .
+          if (!(Test-Path .\ngrok.exe)) { throw "❌ Failed to extract ngrok." }
+      - name: Update ngrok
+        run: .\ngrok.exe update
+
+      - name: Authenticate ngrok
+        run: .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+      - name: Enable Remote Desktop
+        run: |
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+      - name: Set Password for runneradmin
+        run: |
+          $user = Get-LocalUser -Name "runneradmin"
+          if ($user.Enabled -eq $false) { Enable-LocalUser -Name "runneradmin" }
+          $secPass = ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $secPass
+      - name: Start ngrok TCP tunnel (RDP port)
+        run: |
+          Start-Process -FilePath .\ngrok.exe -ArgumentList "tcp 3389" -WindowStyle Hidden
+          Start-Sleep -Seconds 10
+          Get-Content ngrok.log -ErrorAction SilentlyContinue
+      - name: Display connection info
+        run: |
+          $apiUrl = "http://127.0.0.1:4040/api/tunnels"
+          try {
+            $response = Invoke-RestMethod -Uri $apiUrl
+            $tcpAddr = ($response.tunnels | Where-Object { $_.proto -eq "tcp" }).public_url
+            if ($tcpAddr) {
+              Write-Output "✅ Connect using: $tcpAddr"
+            } else {
+              Write-Output "⚠️ Unable to fetch tunnel info yet."
+            }
+          } catch {
+            Write-Output "⚠️ Ngrok API not responding."
+          }
+      - name: Keep Alive (6 hours)
+        run: |
+          for ($i = 0; $i -lt 72; $i++) {
+            Write-Host "⏳ Still alive... Hour: $($i * 5) minutes"
+            Start-Sleep -Seconds 300
+          }
+        continue-on-error: true
