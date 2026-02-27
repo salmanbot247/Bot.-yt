@@ -21,10 +21,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Hacker Tools
+      - name: Install Hacker Tools (yt-dlp Engine)
         run: |
           sudo apt-get install -y ffmpeg gnupg
-          pip install pyTelegramBotAPI pytubefix playwright nest_asyncio
+          # 🔥 Yahan humne pytubefix nikal kar yt-dlp laga diya hai
+          pip install pyTelegramBotAPI yt-dlp playwright nest_asyncio
           playwright install chromium
           playwright install-deps chromium
 
@@ -34,9 +35,6 @@ jobs:
         run: |
           if [ -f "state.json.gpg" ]; then
             gpg --quiet --batch --yes --decrypt --passphrase="$VAULT_PASS" --output state.json state.json.gpg
-          fi
-          if [ -f "tokens.json.gpg" ]; then
-            gpg --quiet --batch --yes --decrypt --passphrase="$VAULT_PASS" --output tokens.json tokens.json.gpg
           fi
 
       - name: Run Telegram Bot
@@ -51,9 +49,6 @@ jobs:
         run: |
           if [ -f "state.json" ]; then
             gpg --quiet --batch --yes --symmetric --passphrase="$VAULT_PASS" --cipher-algo AES256 state.json
-          fi
-          if [ -f "tokens.json" ]; then
-            gpg --quiet --batch --yes --symmetric --passphrase="$VAULT_PASS" --cipher-algo AES256 tokens.json
           fi
 
       - name: Save Encrypted Sessions (Auto-Commit)
