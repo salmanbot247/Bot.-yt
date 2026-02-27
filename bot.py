@@ -5,8 +5,7 @@ import threading
 import queue
 import builtins
 import telebot
-from pytubefix import YouTube
-from pytubefix.helpers import safe_filename
+import yt_dlp  # 🔥 THE ULTIMATE 403 BYPASS ENGINE
 from playwright.sync_api import sync_playwright
 
 # 🔑 Aapki Details
@@ -15,77 +14,20 @@ CHAT_ID = "7144917062"
 bot = telebot.TeleBot(TOKEN)
 
 # ==========================================
-# 🛑 THE INPUT HIJACKER (Bypassing EOF Error)
-# ==========================================
-auth_done = False
-
-@bot.message_handler(commands=['done'])
-def mark_done(message):
-    global auth_done
-    if str(message.chat.id) == str(CHAT_ID):
-        auth_done = True
-        bot.reply_to(message, "✅ **OK! Resuming the bot now...**")
-
-def ghost_input(prompt=""):
-    global auth_done
-    auth_done = False
-    
-    # Jab YouTube enter dabane ka kahega toh bot pause ho jayega
-    bot.send_message(
-        CHAT_ID, 
-        f"⏳ **BOT PAUSED!**\nSystem is waiting... \n\n👉 Jab aap code verify kar lein, toh yahan `/done` likh kar bhejein taake main aage chalu!"
-    )
-    
-    # Loop tab tak chalega jab tak aap /done nahi bhejte
-    while not auth_done:
-        time.sleep(2)
-    return ""
-
-# System ke original input ko apne ghost_input se badal diya
-builtins.input = ghost_input
-
-# ==========================================
-# 👁️ THE GHOST WHISPERER (Terminal Hijacker)
-# ==========================================
-class ConsoleSpy:
-    def __init__(self):
-        self.original_stdout = sys.stdout
-        
-    def write(self, text):
-        self.original_stdout.write(text)
-        
-        # YouTube ka device link aate hi Telegram par bhej dega
-        if "google.com/device" in text:
-            try:
-                bot.send_message(
-                    CHAT_ID, 
-                    f"🚨 **YOUTUBE LOGIN REQUIRED** 🚨\n\n```text\n{text.strip()}\n```",
-                    parse_mode="Markdown"
-                )
-            except: pass
-            
-    def flush(self):
-        self.original_stdout.flush()
-
-sys.stdout = ConsoleSpy()
-
-# ==========================================
 # 🤖 BOT LOGIC & QUEUE SYSTEM
 # ==========================================
 task_queue = queue.Queue()
 is_working = False
 user_context = {"state": "IDLE", "number": None, "otp": None}
 
-# 🛡️ THE IRON SHIELD: Ajnabi logon ko block karega
 @bot.message_handler(func=lambda message: str(message.chat.id) != str(CHAT_ID))
 def block_strangers(message):
     bot.reply_to(message, "🚫 Access Denied! You are not the Admin.")
 
 @bot.message_handler(commands=['start', 'status'])
 def welcome_status(message):
-    bot.send_message(CHAT_ID, f"🤖 **GOD MODE ACTIVATED**\n📊 Queue: {task_queue.qsize()} | Working: {is_working}\n🔗 Send YouTube Link to start!")
+    bot.send_message(CHAT_ID, f"🤖 **GOD MODE ACTIVATED (yt-dlp Engine)**\n📊 Queue: {task_queue.qsize()} | Working: {is_working}\n🔗 Send YouTube Link to start!")
 
-# 📩 Text Handler (Links aur JazzDrive OTP ke liye)
 @bot.message_handler(func=lambda m: str(m.chat.id) == str(CHAT_ID) and not m.text.startswith('/'))
 def handle_msg(message):
     global is_working
@@ -116,22 +58,28 @@ def worker_loop():
 def process_video(link):
     bot.send_message(CHAT_ID, f"🎬 Processing: {link}")
     
-    # --- 1. DOWNLOAD YOUTUBE ---
+    # --- 1. DOWNLOAD YOUTUBE (yt-dlp 403 Bypass) ---
     try:
-        bot.send_message(CHAT_ID, "⬇️ Downloading YouTube Video...")
-        # Yahan OAuth code print hoga aur bot pause hoga agar zaroorat hui
-        yt = YouTube(link, use_oauth=True, allow_oauth_cache=True)
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        bot.send_message(CHAT_ID, "⬇️ Bypassing 403 Error & Downloading (High Quality)...")
         
-        if not stream:
-            bot.send_message(CHAT_ID, "❌ Koi suitable video quality nahi mili.")
-            return
+        # yt-dlp ki khufiya settings jo YouTube block nahi kar sakta
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[m4a]/best[ext=mp4]/best', # Best Quality
+            'outtmpl': '%(title)s_%(id)s.%(ext)s', # File ka naam
+            'restrictfilenames': True,
+            'noplaylist': True,
+            'quiet': True,
+            'no_warnings': True
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(link, download=True)
+            filename = ydl.prepare_filename(info)
             
-        filename = f"{safe_filename(yt.title)}.mp4"
-        stream.download(filename=filename)
         bot.send_message(CHAT_ID, f"✅ Downloaded: {filename}")
+        
     except Exception as e:
-        bot.send_message(CHAT_ID, f"❌ YT Error: {e}")
+        bot.send_message(CHAT_ID, f"❌ YT Error: {str(e)[:150]}")
         return
 
     # --- 2. UPLOAD TO JAZZDRIVE ---
@@ -172,7 +120,6 @@ def process_video(link):
                 page.click("/html/body/div[2]/div[3]/div/div/form/div/div/div/div[1]")
             fc_info.value.set_files(os.path.abspath(filename))
             
-            # Jab tak "Uploads completed" nahi likha aata, wait karega
             while not page.locator("text=Uploads completed").is_visible():
                 time.sleep(2)
                 
@@ -185,5 +132,4 @@ def process_video(link):
         if os.path.exists(filename): 
             os.remove(filename)
 
-# Bot ko 24/7 zinda rakhne ki command
 bot.polling(non_stop=True)
