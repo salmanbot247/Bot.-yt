@@ -2,8 +2,6 @@ import os
 import asyncio
 import yt_dlp
 import nest_asyncio
-import urllib.request
-import urllib.parse
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from playwright.async_api import async_playwright
@@ -17,32 +15,11 @@ ADMIN_ID = 7144917062
 user_otp = None
 
 # ==========================================
-# 📡 TELEGRAM SENDER (For TV Auth Code)
-# ==========================================
-def send_tg_msg(text):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    data = urllib.parse.urlencode({'chat_id': ADMIN_ID, 'text': text}).encode('utf-8')
-    try: urllib.request.urlopen(url, data=data)
-    except: pass
-
-class YtLogger:
-    def debug(self, msg):
-        if "google.com/device" in msg or "enter code" in msg.lower():
-            send_tg_msg(f"📺 **YOUTUBE TV LOGIN REQUIRED** 📺\n\n{msg}\n\n👉 Jaldi se link open karein aur browser mein code daalein. Main yahin ruka hua hoon!")
-        print(msg)
-    def warning(self, msg):
-        if "google.com/device" in msg or "enter code" in msg.lower():
-            send_tg_msg(f"📺 **YOUTUBE TV LOGIN REQUIRED** 📺\n\n{msg}\n\n👉 Jaldi se link open karein aur code daalein!")
-        print(msg)
-    def error(self, msg):
-        print(msg)
-
-# ==========================================
 # 🔑 LOGIN SYSTEM (JazzDrive)
 # ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    await update.message.reply_text("👋 Boss! The Ultimate TV-Auth Bot online hai.\n\nLogin command: `/login 03xxxxxxxxx`", parse_mode='Markdown')
+    await update.message.reply_text("👋 Boss! The Anti-Bot Bypass Edition is online.\n\nLogin command: `/login 03xxxxxxxxx`", parse_mode='Markdown')
 
 async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -95,7 +72,7 @@ async def playwright_login_task(num, update):
         await update.message.reply_text(f"❌ Login Error: {e}")
 
 # ==========================================
-# 📥 MESSAGE HANDLER (Link & OTP)
+# 📥 MESSAGE HANDLER
 # ==========================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -117,18 +94,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 Boss, main sirf YouTube links aur 4-digit OTP samajhta hoon.")
 
 # ==========================================
-# 📺 QUALITY MENU & DOWNLOADER (TV AUTH)
+# 📺 QUALITY MENU & DOWNLOADER
 # ==========================================
 async def process_youtube_link(url, update):
-    await update.message.reply_text("🔍 Video scan kar raha hoon... (Agar YouTube ne roka toh TV Code bhejunga)")
+    await update.message.reply_text("🔍 Video scan kar raha hoon...")
     
-    # 📺 YAHAN TV OAUTH2 ENABLE KIYA GAYA HAI
+    # 🛡️ THE ANTI-BOT CLIENT SPOOFING
     ydl_opts = {
         'quiet': True, 
-        'username': 'oauth2',
-        'password': '',
-        'logger': YtLogger(),
-        'extractor_args': {'youtube': {'client': ['android', 'ios']}}
+        'no_warnings': True,
+        'extractor_args': {'youtube': {'client': ['ios', 'android', 'tv']}}
     }
     
     try:
@@ -156,10 +131,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'outtmpl': filename,
         'merge_output_format': 'mp4',
         'quiet': True,
-        'username': 'oauth2',
-        'password': '',
-        'logger': YtLogger(),
-        'extractor_args': {'youtube': {'client': ['android', 'ios']}}
+        'extractor_args': {'youtube': {'client': ['ios', 'android', 'tv']}}
     }
     
     try:
