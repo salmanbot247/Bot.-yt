@@ -2,9 +2,8 @@ name: 24/7 Telegram JazzDrive Bot
 
 on:
   schedule:
-    # Har 5 ghante baad yeh bot khud auto-restart hoga (6 ghante ki limit se pehle)
     - cron: '0 */5 * * *'
-  workflow_dispatch: # Button se manual start karne ke liye
+  workflow_dispatch:
 
 jobs:
   run-bot:
@@ -20,13 +19,10 @@ jobs:
 
       - name: Install Engines & Tools
         run: |
-          pip install python-telegram-bot yt-dlp playwright nest_asyncio
+          pip install python-telegram-bot yt-dlp playwright nest_asyncio requests
           playwright install chromium
           playwright install-deps chromium
 
       - name: Start The Bot
-        # 290 minutes (lag bhag 5 ghante) baad yeh process close hoga taake agla cron job isay utha le
         timeout-minutes: 290
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: python bot.py
