@@ -2,6 +2,8 @@ import os
 import asyncio
 import yt_dlp
 import nest_asyncio
+import urllib.request
+import urllib.parse
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from playwright.async_api import async_playwright
@@ -15,11 +17,32 @@ ADMIN_ID = 7144917062
 user_otp = None
 
 # ==========================================
-# 🔑 LOGIN SYSTEM (With Jasoosi Screenshot)
+# 📡 TELEGRAM SENDER (For TV Auth Code)
+# ==========================================
+def send_tg_msg(text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    data = urllib.parse.urlencode({'chat_id': ADMIN_ID, 'text': text}).encode('utf-8')
+    try: urllib.request.urlopen(url, data=data)
+    except: pass
+
+class YtLogger:
+    def debug(self, msg):
+        if "google.com/device" in msg or "enter code" in msg.lower():
+            send_tg_msg(f"📺 **YOUTUBE TV LOGIN REQUIRED** 📺\n\n{msg}\n\n👉 Jaldi se link open karein aur browser mein code daalein. Main yahin ruka hua hoon!")
+        print(msg)
+    def warning(self, msg):
+        if "google.com/device" in msg or "enter code" in msg.lower():
+            send_tg_msg(f"📺 **YOUTUBE TV LOGIN REQUIRED** 📺\n\n{msg}\n\n👉 Jaldi se link open karein aur code daalein!")
+        print(msg)
+    def error(self, msg):
+        print(msg)
+
+# ==========================================
+# 🔑 LOGIN SYSTEM (JazzDrive)
 # ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    await update.message.reply_text("👋 Boss! Bot online hai. Login command: `/login 03xxxxxxxxx`", parse_mode='Markdown')
+    await update.message.reply_text("👋 Boss! The Ultimate TV-Auth Bot online hai.\n\nLogin command: `/login 03xxxxxxxxx`", parse_mode='Markdown')
 
 async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -38,28 +61,17 @@ async def playwright_login_task(num, update):
     global user_otp
     try:
         async with async_playwright() as p:
-            # 🛡️ Anti-Bot Bypass Args
             browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-blink-features=AutomationControlled'])
-            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
             page = await context.new_page()
             
             await page.goto("https://cloud.jazzdrive.com.pk/login", timeout=60000)
-            await asyncio.sleep(3) # Page load hone ka wait
-            
+            await asyncio.sleep(3)
             await page.fill('input[type="tel"]', num)
             await asyncio.sleep(1)
             await page.click('#signinbtn')
             
-            await update.message.reply_text("📸 Button click ho gaya! Screen check kar raha hoon...")
-            await asyncio.sleep(4) # JazzDrive ke response ka wait
-            
-            # 🕵️ THE JASOOSI SCREENSHOT 🕵️
-            await page.screenshot(path="debug_login.png")
-            try:
-                await update.message.reply_photo(photo=open("debug_login.png", 'rb'), caption="👀 Boss, Playwright ko is waqt screen aisi nazar aa rahi hai!")
-            except: pass
-            
-            await update.message.reply_text("🔢 Agar OTP aa gaya hai, toh jaldi se chat mein apna 4-digit OTP bhejein.")
+            await update.message.reply_text("🔢 OTP bhej diya gaya hai! Chat mein apna 4-digit OTP bhejein.")
             
             wait_time = 0
             while user_otp is None and wait_time < 120:
@@ -76,14 +88,14 @@ async def playwright_login_task(num, update):
             await asyncio.sleep(8)
             
             await context.storage_state(path="jazz_cookies.json")
-            await update.message.reply_text("✅ Boss, Login 100% Successful!")
+            await update.message.reply_text("✅ Boss, JazzDrive Login 100% Successful!")
             user_otp = None
             await browser.close()
     except Exception as e:
         await update.message.reply_text(f"❌ Login Error: {e}")
 
 # ==========================================
-# 📥 MESSAGE HANDLER (Link & OTP Catcher)
+# 📥 MESSAGE HANDLER (Link & OTP)
 # ==========================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -97,7 +109,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     if "youtu.be" in text or "youtube.com" in text:
         if not os.path.exists("jazz_cookies.json"):
-            await update.message.reply_text("⚠️ Boss, pehle login toh kar lein! Command: /login 03xxxxxxxxx")
+            await update.message.reply_text("⚠️ Boss, pehle JazzDrive login toh kar lein! Command: /login 03xxxxxxxxx")
             return
         await process_youtube_link(text, update)
         return
@@ -105,11 +117,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤔 Boss, main sirf YouTube links aur 4-digit OTP samajhta hoon.")
 
 # ==========================================
-# 📺 QUALITY MENU & DOWNLOADER
+# 📺 QUALITY MENU & DOWNLOADER (TV AUTH)
 # ==========================================
 async def process_youtube_link(url, update):
-    await update.message.reply_text("🔍 Video scan kar raha hoon...")
-    ydl_opts = {'quiet': True, 'extractor_args': {'youtube': {'client': ['android', 'ios']}}}
+    await update.message.reply_text("🔍 Video scan kar raha hoon... (Agar YouTube ne roka toh TV Code bhejunga)")
+    
+    # 📺 YAHAN TV OAUTH2 ENABLE KIYA GAYA HAI
+    ydl_opts = {
+        'quiet': True, 
+        'username': 'oauth2',
+        'password': '',
+        'logger': YtLogger(),
+        'extractor_args': {'youtube': {'client': ['android', 'ios']}}
+    }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = await asyncio.to_thread(ydl.extract_info, url, download=False)
@@ -126,14 +147,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.from_user.id != ADMIN_ID: return
     await query.answer()
     res, url = query.data.split("|", 1)
-    await query.edit_message_text(f"⏳ Downloading at {res}p... please wait.")
+    await query.edit_message_text(f"⏳ Downloading at {res}p... Pura zor lag raha hai!")
     
     filename = f"video_{res}.mp4"
+    
     ydl_opts = {
         'format': f'bestvideo[height<={res}][ext=mp4]+bestaudio[ext=m4a]/best',
         'outtmpl': filename,
         'merge_output_format': 'mp4',
         'quiet': True,
+        'username': 'oauth2',
+        'password': '',
+        'logger': YtLogger(),
         'extractor_args': {'youtube': {'client': ['android', 'ios']}}
     }
     
@@ -143,8 +168,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"✅ Download complete! Uploading to JazzDrive...")
         
         success = await upload_to_jazz(filename)
-        if success: await query.message.reply_text("🎉 MISSION COMPLETE! Video Drive mein safe hai.")
-        else: await query.message.reply_text("❌ Upload failed.")
+        if success: await query.message.reply_text("🎉 MISSION COMPLETE! Video JazzDrive mein safe hai.")
+        else: await query.message.reply_text("❌ Upload failed. Ek dafa Drive check karein.")
     except Exception as e:
         await query.message.reply_text(f"❌ Error: {e}")
     finally:
