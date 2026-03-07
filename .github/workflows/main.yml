@@ -18,8 +18,10 @@ jobs:
           python-version: '3.10'
 
       - name: Install Engines & Tools
+        # Yahan yt-dlp ka special master link lagaya hai
         run: |
-          pip install python-telegram-bot yt-dlp playwright nest_asyncio requests
+          pip install python-telegram-bot playwright nest_asyncio requests
+          python -m pip install --force-reinstall https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz
           playwright install chromium
           playwright install-deps chromium
 
